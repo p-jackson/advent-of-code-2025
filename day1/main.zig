@@ -16,15 +16,18 @@ pub fn main() !void {
 
         const num = try std.fmt.parseInt(i32, line[1..], 10);
 
-        switch (line[0]) {
-            'L' => current = @mod(current - num, 100),
-            'R' => current = @mod(current + num, 100),
+        // Returns new new dial position, _and_ how number for calculating zero clicks.
+        const result = switch (line[0]) {
+            'L' => if (current == 0)
+                .{ current - num, num }
+            else
+                .{ current - num, (100 - current) + num },
+            'R' => .{ current + num, current + num },
             else => continue,
-        }
+        };
 
-        if (current == 0) {
-            zero_count += 1;
-        }
+        current = @mod(result[0], 100);
+        zero_count += @abs(@divFloor(result[1], 100));
     }
 
     std.debug.print("{d}\n", .{zero_count});
