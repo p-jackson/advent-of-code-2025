@@ -43,16 +43,38 @@ fn sum_invalid_in_range(low: u64, high: u64) u64 {
 test "sum_invalid_in_range" {
     try expectEqual(33, sum_invalid_in_range(11, 22));
     try expectEqual(38593859, sum_invalid_in_range(38593856, 38593862));
+
+    try expectEqual(565656, sum_invalid_in_range(565653, 565659));
+    try expectEqual(824824824, sum_invalid_in_range(824824821, 824824827));
+    try expectEqual(2121212121, sum_invalid_in_range(2121212118, 2121212124));
 }
 
 fn is_invalid(n: u64) bool {
     const digit_count = std.math.log10(n) + 1;
-    if (digit_count & 1 != 0) {
+
+    if (digit_count < 2) {
         return false;
     }
 
-    const divisor = std.math.pow(u64, 10, digit_count / 2);
-    return @divTrunc(n, divisor) == @mod(n, divisor);
+    blk: for (1..(digit_count / 2 + 1)) |sequence_length| {
+        if (@rem(digit_count, sequence_length) != 0) {
+            continue;
+        }
+
+        const divisor = std.math.pow(u64, 10, sequence_length);
+        const sequence = @mod(n, divisor);
+
+        for (1..@divExact(digit_count, sequence_length)) |i| {
+            const to_compare = @mod(@divFloor(n, std.math.pow(u64, 10, sequence_length * i)), divisor);
+            if (sequence != to_compare) {
+                continue :blk;
+            }
+        }
+
+        return true;
+    }
+
+    return false;
 }
 
 test "is_invalid" {
@@ -65,4 +87,8 @@ test "is_invalid" {
     try expect(!is_invalid(222220));
     try expect(is_invalid(222222));
     try expect(is_invalid(1188511885));
+
+    try expect(is_invalid(123123123));
+    try expect(is_invalid(1212121212));
+    try expect(is_invalid(1111111));
 }
