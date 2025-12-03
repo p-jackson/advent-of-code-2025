@@ -9,29 +9,35 @@ pub fn main() !void {
     var file_reader = file.reader(&io_buffer);
     const reader = &file_reader.interface;
 
-    var sum: u32 = 0;
+    var sum: u64 = 0;
 
     while (try reader.takeDelimiter('\n')) |line| {
-        sum += largest_pair(line);
+        sum += largest_sequence(line);
     }
 
     std.debug.print("{d}\n", .{sum});
 }
 
-fn largest_pair(list: []const u8) u32 {
+fn largest_sequence(list: []const u8) u64 {
     std.debug.assert(list.len >= 2);
 
-    const first, const i = largest_in_range(list[0 .. list.len - 1]);
-    const second, _ = largest_in_range(list[i + 1 ..]);
+    var sum: u64 = 0;
+    var start: usize = 0;
+    for (1..13) |i| {
+        const digit, const pos = largest_in_range(list[start .. list.len - 12 + i]);
+        start += pos + 1;
 
-    return 10 * (first - '0') + (second - '0');
+        sum = sum * 10 + @as(u64, digit - '0');
+    }
+
+    return sum;
 }
 
-test "largest_pair" {
-    try expectEqual(98, largest_pair("987654321111111"));
-    try expectEqual(89, largest_pair("811111111111119"));
-    try expectEqual(78, largest_pair("234234234234278"));
-    try expectEqual(92, largest_pair("818181911112111"));
+test "largest_sequence" {
+    try expectEqual(987654321111, largest_sequence("987654321111111"));
+    try expectEqual(811111111119, largest_sequence("811111111111119"));
+    try expectEqual(434234234278, largest_sequence("234234234234278"));
+    try expectEqual(888911112111, largest_sequence("818181911112111"));
 }
 
 fn largest_in_range(list: []const u8) struct { u8, usize } {
