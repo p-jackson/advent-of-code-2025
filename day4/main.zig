@@ -15,46 +15,38 @@ pub fn main() !void {
 }
 
 fn count_accessable_rolls_in_input(allocator: std.mem.Allocator, reader: *std.Io.Reader) !u32 {
-    var count: u32 = 0;
-
     var arena: std.heap.ArenaAllocator = .init(allocator);
     defer arena.deinit();
     var arena_alloc = arena.allocator();
 
-    var rows_buffer: [3][]u8 = undefined;
-    var rows: std.ArrayList([]u8) = .initBuffer(&rows_buffer);
-
-    var row_count: usize = 0;
+    var rows: std.ArrayList([]u8) = .empty;
 
     while (try reader.takeDelimiter('\n')) |current_line| {
-        if (rows.items.len < rows.capacity) {
-            rows.appendAssumeCapacity(try arena_alloc.alloc(u8, current_line.len));
+        try rows.append(arena_alloc, try arena_alloc.alloc(u8, current_line.len));
+        @memcpy(rows.items[rows.items.len - 1], current_line);
+    }
+
+    var count: u32 = 0;
+    var last_count: ?u32 = null;
+
+    while (last_count == null or last_count.? != count) {
+        last_count = count;
+
+        for (0..rows.items.len) |row_index| {
+            count += count_and_mark_accessable_rolls_in_row(rows.items, row_index);
         }
 
-        std.debug.assert(current_line.len == rows.items[row_count].len);
-
-        @memcpy(rows.items[row_count], current_line);
-        row_count += 1;
-
-        std.debug.assert(row_count <= rows.items.len);
-
-        if (row_count == 1) {
-            continue;
-        }
-
-        count += count_accessable_rolls_in_row(rows.items, row_count - 2);
-
-        if (row_count > 2) {
-            // Recycle buffers, using the oldest row's buffer for the next line.
-            const temp = rows.items[0];
-            rows.items[0] = rows.items[1];
-            rows.items[1] = rows.items[2];
-            rows.items[2] = temp;
-            row_count = 2;
+        // Remove marked rolls
+        for (rows.items) |row| {
+            for (0..row.len) |i| {
+                if (row[i] == 'x') {
+                    row[i] = '.';
+                }
+            }
         }
     }
 
-    return count + count_accessable_rolls_in_row(rows.items[0..row_count], row_count - 1);
+    return count;
 }
 
 test "count_accessable_rolls_in_input" {
@@ -68,20 +60,15 @@ test "count_accessable_rolls_in_input" {
     try expectEqual(1, count_accessable_rolls_in_input(allocator, &corner2x2));
 
     var full3x3 = build_reader("@@@\n@@@\n@@@\n");
-    try expectEqual(4, count_accessable_rolls_in_input(allocator, &full3x3));
-
-    var input_sample = build_reader("@..@@.@.@@@....@@\n@.@@.@@@@@@..@.@@\n@@.@@@@@.@.@@.@@@\n");
-    try expectEqual(17, count_accessable_rolls_in_input(allocator, &input_sample));
-
-    var input_sample2 = build_reader("@..@@.@.@@@....@@\n@.@@.@@@@@@..@.@@\n@@.@@@@@.@.@@.@@@\n@@@@.@..@@@.@@.@@\n.@@@@.@@@.@@.@@@.\n@@@@@@@.@@.@.@.@@\n..@@@.@@.@...@.@@\n@@.@.@.@@..@@@@.@\n@@.@.@@@@.@@@@..@\n");
-    try expectEqual(22, count_accessable_rolls_in_input(allocator, &input_sample2));
+    try expectEqual(9, count_accessable_rolls_in_input(allocator, &full3x3));
 }
 
-fn count_accessable_rolls_in_row(rows: [][]u8, row_to_check: usize) u32 {
+fn count_and_mark_accessable_rolls_in_row(rows: [][]u8, row_to_check: usize) u32 {
     var count: u32 = 0;
     for (0..rows[row_to_check].len) |index| {
         if (rows[row_to_check][index] == '@' and count_adjacent_rolls(rows, row_to_check, index) < 4) {
             count += 1;
+            rows[row_to_check][index] = 'x';
         }
     }
     return count;
@@ -112,7 +99,7 @@ fn count_adjacent_rolls(rows: [][]u8, row_index: usize, index_in_row: usize) u32
 /// Returns 1 if the cell has a roll, otherwise 0.
 fn check_cell(rows: [][]u8, row_index: usize, index_in_row: usize) u32 {
     return if (row_index < rows.len and index_in_row < rows[row_index].len)
-        @intFromBool(rows[row_index][index_in_row] == '@')
+        @intFromBool(rows[row_index][index_in_row] == '@' or rows[row_index][index_in_row] == 'x')
     else
         0;
 }
